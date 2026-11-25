@@ -1,6 +1,6 @@
 {
-  "name": "Mobile-Epub-reader",
-  "short_name": "Mobile-Epub-reader",
+  "name": "MobileEpubReader",
+  "short_name": "MobileEpubReader",
   "description": "Read EPUB books and have them read aloud.",
   "start_url": "./",
   "scope": "./",

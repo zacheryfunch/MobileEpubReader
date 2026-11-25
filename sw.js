@@ -1,7 +1,7 @@
 // Lets EPUB Reader open without internet once it has been opened once.
 // Always tries the network first (so updates show up), and falls back to the
 // saved copy. The PC engine's /api/ addresses are never saved.
-const CACHE = 'epub-reader-v3';
+const CACHE = 'epub-reader-v4';
 const FILES = ['./', 'index.html', 'reader.js', 'speech.js', 'books-db.js', 'vendor/jszip.min.js',
   'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
