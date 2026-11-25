@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Books are other people's files: never let anything inside them run code. -->
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>EPUB Reader</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Reader">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f6f4ef">
+<style>
+:root {
+  --bg: #f6f4ef; --panel: #ffffff; --ink: #1f1d1a; --muted: #6b665d; --line: #e3ded3; --accent: #3c5a8a;
+  --hl: rgba(255, 205, 80, .45);
+  --size: 19px; --measure: 38em; --font: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
+}
+:root[data-theme="sepia"] { --bg: #f3e9d4; --panel: #faf3e3; --ink: #3b2f22; --muted: #7d6a52; --line: #e2d3b6; --accent: #8a5a2b; }
+:root[data-theme="dark"]  { --bg: #17171a; --panel: #212126; --ink: #dddcd7; --muted: #9a978f; --line: #34343b; --accent: #8fb0e6; --hl: rgba(143, 176, 230, .30); }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] { --bg: #17171a; --panel: #212126; --ink: #dddcd7; --muted: #9a978f; --line: #34343b; --accent: #8fb0e6; --hl: rgba(143, 176, 230, .30); }
+}
+:root[data-font="sans"] { --font: system-ui, -apple-system, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-text-size-adjust: 100%; }
+button, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: .4; cursor: default; }
+a { color: var(--accent); }
+[hidden] { display: none !important; }
+
+/* Bookshelf */
+#shelf { max-width: 760px; margin: 0 auto; padding: calc(24px + var(--safe-t)) 16px calc(64px + var(--safe-b)); }
+#shelf h1 { font-size: 1.5rem; margin: 0 0 4px; }
+#shelf h2 { font-size: .95rem; color: var(--muted); margin: 22px 0 8px; font-weight: 600; }
+.sub { color: var(--muted); margin: 0 0 18px; }
+.shelf-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+#openFile { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; padding: 9px 16px; }
+.books { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.books:empty { display: none; }
+.books li { border-bottom: 1px solid var(--line); display: flex; align-items: stretch; }
+.books li:last-child { border-bottom: 0; }
+.books .open { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px;
+  flex: 1; min-width: 0; padding: 12px 16px; cursor: pointer; }
+.books .open:hover, .books .open:focus-visible { background: var(--bg); }
+.books .del { border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; color: var(--muted); padding: 0 16px; }
+.books .del:hover { color: #b23b3b; }
+.bname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bmeta { color: var(--muted); font-size: .85rem; text-align: right; white-space: nowrap; }
+.bprog { grid-column: 1 / -1; color: var(--muted); font-size: .85rem; }
+#drop { margin-top: 18px; border: 2px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; color: var(--muted); }
+@media (pointer: coarse) { #drop { display: none; } }
+body.dragging #drop { border-color: var(--accent); color: var(--accent); }
+#shelfMsg { color: var(--muted); }
+#install { margin-top: 26px; font-size: .88rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+
+/* Reading view */
+#bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px;
+  padding: calc(8px + var(--safe-t)) 12px 8px; background: var(--bg); border-bottom: 1px solid var(--line); transition: transform .2s; }
+#bar.hide { transform: translateY(-100%); }
+#where { flex: 1; min-width: 0; text-align: center; font-size: .85rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bar button { padding: 5px 10px; }
+@media (max-width: 520px) { #bar .wide { display: none; } }
+#settings { position: fixed; top: calc(52px + var(--safe-t)); right: 12px; z-index: 6; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px; width: min(290px, calc(100vw - 24px)); max-height: calc(100vh - 140px); overflow: auto;
+  box-shadow: 0 8px 30px rgba(0,0,0,.15); }
+#settings .rowset { display: flex; gap: 6px; margin: 4px 0 12px; flex-wrap: wrap; align-items: center; }
+#settings label { font-size: .8rem; color: var(--muted); }
+#settings .on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+#settings select { width: 100%; }
+#settings input[type=range] { flex: 1; accent-color: var(--accent); }
+.tiny { font-size: .78rem; color: var(--muted); margin: -6px 0 10px; }
+#toc { position: fixed; inset: 0 auto 0 0; z-index: 7; width: min(360px, 90vw); background: var(--panel);
+  border-right: 1px solid var(--line); overflow: auto; padding: calc(12px + var(--safe-t)) 0 calc(12px + var(--safe-b));
+  box-shadow: 0 0 40px rgba(0,0,0,.2); }
+#toc h2 { font-size: 1rem; margin: 4px 16px 10px; }
+#toc ol { list-style: none; margin: 0; padding: 0; }
+#toc button { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 9px 16px; cursor: pointer;
+  font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#toc button:hover { background: var(--bg); }
+#toc button.cur { color: var(--accent); font-weight: 600; }
+#scrim { position: fixed; inset: 0; z-index: 6; background: rgba(0,0,0,.25); }
+
+#page { max-width: var(--measure); margin: 0 auto; padding: 24px 20px 40px; font-family: var(--font);
+  font-size: var(--size); line-height: 1.65; overflow-wrap: break-word; }
+#page h1, #page h2, #page h3 { line-height: 1.3; }
+#page h1 { font-size: 1.45em; text-align: center; margin: .6em 0 1.2em; }
+#page p { margin: 0 0 .9em; }
+#page img, #page svg { max-width: 100%; height: auto; }
+#page blockquote { margin: 1em 1.2em; font-style: italic; }
+#page table { border-collapse: collapse; max-width: 100%; }
+#page td, #page th { border: 1px solid var(--line); padding: 4px 8px; }
+#page pre { white-space: pre-wrap; }
+.snt { border-radius: 3px; transition: background-color .15s; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.snt.speaking { background: var(--hl); }
+.snt.chosen { background: var(--hl); outline: 1px dashed var(--accent); }
+#end { max-width: var(--measure); margin: 0 auto; padding: 0 20px calc(110px + var(--safe-b)); display: flex; gap: 12px;
+  justify-content: space-between; align-items: center; }
+#end .count { color: var(--muted); font-size: .85rem; }
+#end button { padding: 10px 18px; font-weight: 600; }
+#nextBtn { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+#progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--accent); width: 0; z-index: 9; }
+
+/* Read-aloud player */
+#player { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--safe-b)); z-index: 8;
+  display: flex; align-items: center; gap: 6px; padding: 6px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+#player button { border: 0; background: none; border-radius: 999px; min-width: 44px; height: 44px; padding: 0 12px; font-size: 1.05rem; white-space: nowrap; }
+#playBtn { min-width: 108px !important; }
+#player button:hover { background: var(--bg); }
+#playBtn { background: var(--accent) !important; color: var(--bg); font-weight: 600; padding: 0 18px !important; }
+#rateBtn { font-size: .9rem !important; font-variant-numeric: tabular-nums; color: var(--muted); }
+#speakMsg { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(70px + var(--safe-b)); z-index: 8;
+  background: var(--ink); color: var(--bg); padding: 6px 12px; border-radius: 8px; font-size: .85rem; max-width: 90vw; }
+</style>
+</head>
+<body>
+<!-- ======== Bookshelf ======== -->
+<section id="shelf">
+  <h1>Bookshelf</h1>
+  <p class="sub" id="shelfSub">Tap a book to read. It opens where you left off.</p>
+  <div class="shelf-actions">
+    <button id="openFile" type="button">＋ Add a book</button>
+  </div>
+  <p id="shelfMsg"></p>
+  <h2 id="savedHead" hidden>Saved in this app</h2>
+  <ul id="saved" class="books"></ul>
+  <h2 id="dlHead" hidden>In your Downloads folder</h2>
+  <ul id="books" class="books"></ul>
+  <div id="drop">…or drag an EPUB file onto this window.</div>
+  <input id="fileInput" type="file" accept=".epub,application/epub+zip" hidden>
+  <p id="install" hidden>On iPhone: tap <b>Share</b> then <b>Add to Home Screen</b> to keep this reader as an app.
+    Books you add stay saved in it, and it works without internet.</p>
+</section>
+
+<!-- ======== Reading view ======== -->
+<section id="reader" hidden>
+  <header id="bar">
+    <button id="shelfBtn" type="button" title="Back to the bookshelf" aria-label="Back to the bookshelf">←<span class="wide"> Shelf</span></button>
+    <button id="tocBtn" type="button" title="Chapters (C)" aria-label="Chapters">☰<span class="wide"> Chapters</span></button>
+    <div id="where"></div>
+    <button id="setBtn" type="button" title="Text, colours and voice" aria-label="Settings">Aa</button>
+  </header>
+  <div id="settings" hidden>
+    <label>Text size</label>
+    <div class="rowset"><button id="smaller" type="button" aria-label="Smaller text">A−</button><button id="bigger" type="button" aria-label="Bigger text">A+</button><span id="sizeVal" style="color:var(--muted)"></span></div>
+    <label>Colours</label>
+    <div class="rowset" id="themes"><button data-theme="auto" type="button">Auto</button><button data-theme="light" type="button">Light</button><button data-theme="sepia" type="button">Sepia</button><button data-theme="dark" type="button">Dark</button></div>
+    <label>Font</label>
+    <div class="rowset" id="fonts"><button data-font="serif" type="button">Book</button><button data-font="sans" type="button">Plain</button></div>
+    <label>Line width</label>
+    <div class="rowset" id="widths"><button data-width="30em" type="button">Narrow</button><button data-width="38em" type="button">Medium</button><button data-width="52em" type="button">Wide</button></div>
+    <div id="voiceSet">
+      <label for="voiceSel">Reading voice</label>
+      <div class="rowset"><select id="voiceSel"></select></div>
+      <p class="tiny">Better voices: iPhone Settings → Accessibility → Spoken Content → Voices → download an "Enhanced" or "Premium" voice.</p>
+      <label for="rate">Reading speed <span id="rateVal"></span></label>
+      <div class="rowset"><input id="rate" type="range" min="0.5" max="2" step="0.05"></div>
+    </div>
+  </div>
+  <div id="scrim" hidden></div>
+  <nav id="toc" hidden aria-label="Chapters"><h2 id="tocTitle"></h2><ol id="tocList"></ol></nav>
+  <article id="page" tabindex="-1"></article>
+  <footer id="end">
+    <button id="prevBtn" type="button">← Previous</button>
+    <span class="count" id="count"></span>
+    <button id="nextBtn" type="button">Next chapter →</button>
+  </footer>
+  <div id="player" hidden>
+    <button id="backBtn" type="button" title="Previous sentence" aria-label="Previous sentence">⏮</button>
+    <button id="playBtn" type="button" title="Read aloud (R)">▶ Read</button>
+    <button id="fwdBtn" type="button" title="Next sentence" aria-label="Next sentence">⏭</button>
+    <button id="rateBtn" type="button" title="Reading speed">1.0×</button>
+  </div>
+  <div id="speakMsg" role="status" hidden></div>
+  <div id="progress"></div>
+</section>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="books-db.js"></script>
+<script src="speech.js"></script>
+<script src="reader.js"></script>
+</body>
+</html>
