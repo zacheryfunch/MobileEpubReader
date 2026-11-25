@@ -502,7 +502,8 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
 }
 
 async function detectEngine() {
-  if (!/^https?:$/.test(location.protocol)) return false;
+  // The engine only ever runs on this PC; the online copy never asks for it.
+  if (!/^https?:$/.test(location.protocol) || !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return false;
   try {
     const r = await fetch('api/ping', { cache: 'no-store' });
     return r.ok && (await r.json()).ok === true;
