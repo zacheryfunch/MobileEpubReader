@@ -304,7 +304,7 @@ function backToShelf() {
   savePos();
   showToc(false); $('settings').hidden = true;
   $('reader').hidden = true; $('shelf').hidden = false;
-  document.title = 'EPUB Reader';
+  document.title = 'Mobile-Epub-reader';
   history.replaceState(null, '', location.pathname);
   loadShelf();
 }
